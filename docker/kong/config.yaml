@@ -16,6 +16,7 @@ services:
           - https
         paths:
           - /orders
+        strip_path: true
 
   - name: invoices
     url: http://host.docker.internal:3334
