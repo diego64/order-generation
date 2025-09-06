@@ -5,12 +5,12 @@ on:
   workflow_dispatch:
 
 jobs:
-  Microservicos:
+  Integracao:
     runs-on: ubuntu-latest
 
     steps:
       # Checkout do repositório
-      - name: Checagem do repositório
+      - name: Checkout repository
         uses: actions/checkout@v4
 
       # Setup Node.js
@@ -19,16 +19,15 @@ jobs:
         with:
           node-version: '20'
 
-      # Instalação do Docker Compose e cliente PostgreSQL
-      - name: Instalação do Docker Compose e PostgreSQL Client
-        run: sudo apt-get update && sudo apt-get install -y docker-compose postgresql-client
+      # Instalação do Docker Compose
+      - name: Instalação do Docker Compose
+        run: sudo apt-get update && sudo apt-get install -y docker-compose
 
       # Subir serviços base (RabbitMQ, Kong, Jaeger)
-      - name: Build e Start do docker-compose
+      - name: Build e Start docker-compose
         run: docker-compose up -d --build
 
-      # Aguardando inicialização dos serviços de mensageria, API-Gateway e logs
-      - name: Aguardando serviços base
+      - name: Aguardando inicialização dos serviços base
         run: |
           echo "Esperando RabbitMQ iniciar..."
           until nc -z localhost 5672; do sleep 2; done
@@ -36,14 +35,6 @@ jobs:
           until nc -z localhost 8001; do sleep 2; done
           echo "Esperando Jaeger iniciar..."
           sleep 5
-
-      # Criação dos bancos de dados
-      - name: Criar banco app-orders
-        run: |
-          psql postgresql://docker:docker@localhost:5482/postgres -c "CREATE DATABASE orders;" || echo "Banco orders já existe"
-      - name: Criar banco app-invoices
-        run: |
-          psql postgresql://docker:docker@localhost:5483/postgres -c "CREATE DATABASE invoices;" || echo "Banco invoices já existe"
 
       # Build da imagem app-orders
       - name: Build app-orders
@@ -55,7 +46,7 @@ jobs:
         working-directory: app-orders
         run: |
           docker run --rm \
-            -e DATABASE_URL="postgresql://docker:docker@localhost:5482/orders" \
+            -e DATABASE_URL="postgres://user:password@host:5432/dbname" \
             -e OTEL_SERVICE_NAME="app-orders" \
             --entrypoint sh \
             app-orders -c "npx drizzle-kit generate && npx drizzle-kit migrate"
@@ -70,7 +61,7 @@ jobs:
         working-directory: app-invoices
         run: |
           docker run --rm \
-            -e DATABASE_URL="postgresql://docker:docker@localhost:5483/invoices" \
+            -e DATABASE_URL="postgres://review:Passw0rd2023!@host.docker.internal:5432/review" \
             -e OTEL_SERVICE_NAME="app-invoices" \
             --entrypoint sh \
             app-invoices -c "npx drizzle-kit generate && npx drizzle-kit migrate"
