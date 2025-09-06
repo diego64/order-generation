@@ -48,27 +48,30 @@ jobs:
           docker run --rm \
             -e DATABASE_URL="postgres://user:password@host:5432/dbname" \
             -e OTEL_SERVICE_NAME="app-orders" \
-            app-orders sh -c "npx drizzle-kit generate && npx drizzle-kit migrate"
+            --entrypoint sh \
+            app-orders -c "npx drizzle-kit generate && npx drizzle-kit migrate"
 
-      # Build e migrations do app-invoices
+      # Build da imagem app-invoices
       - name: Build app-invoices
         working-directory: app-invoices
         run: docker build -t app-invoices .
 
+      # Rodar migrations do app-invoices
       - name: Rodar migrations app-invoices
         working-directory: app-invoices
         run: |
           docker run --rm \
             -e DATABASE_URL="postgres://review:Passw0rd2023!@host.docker.internal:5432/review" \
             -e OTEL_SERVICE_NAME="app-invoices" \
-            app-invoices sh -c "npx drizzle-kit generate && npx drizzle-kit migrate"
+            --entrypoint sh \
+            app-invoices -c "npx drizzle-kit generate && npx drizzle-kit migrate"
 
       # Rodar servidor app-orders e testar endpoint
       - name: Execução do servidor app-orders
         working-directory: app-orders
         run: |
           npx tsc
-          node ./dist/src/server.js &
+          node ./dist/src/server.js &  # roda em background
           SERVER_PID=$!
           sleep 5
           for i in {1..8}; do
