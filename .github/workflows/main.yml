@@ -5,12 +5,12 @@ on:
   workflow_dispatch:
 
 jobs:
-  Integracao:
+  Microservicos:
     runs-on: ubuntu-latest
 
     steps:
       # Checkout do repositório
-      - name: Checkout repository
+      - name: Checagem do repositório
         uses: actions/checkout@v4
 
       # Setup Node.js
@@ -19,15 +19,26 @@ jobs:
         with:
           node-version: '20'
 
-      # Instalação do Docker Compose
-      - name: Instalação do Docker Compose
-        run: sudo apt-get update && sudo apt-get install -y docker-compose
+      # Instalação do Docker Compose e cliente PostgreSQL
+      - name: Instalação do Docker Compose e PostgreSQL Client
+        run: sudo apt-get update && sudo apt-get install -y docker-compose postgresql-client
 
-      # Subir serviços base (RabbitMQ, Kong, Jaeger)
-      - name: Build e Start docker-compose
+      # Inicialização do Banco de dados PostgreSQL (orders)
+      - name: Build do Banco de dados orders
+        working-directory: app-orders
         run: docker-compose up -d --build
 
-      - name: Aguardando inicialização dos serviços base
+      # Inicialização do Banco de dados PostgreSQL (invoices)
+      - name: Build do Banco de dados invoices
+        working-directory: app-invoices
+        run: docker-compose up -d --build
+
+      # Subir serviços base (RabbitMQ, Kong, Jaeger)
+      - name: Build e Start do docker-compose
+        run: docker-compose -f docker-compose.yml up -d --build
+
+      # Aguardando inicialização dos serviços de mensageria, API-Gateway e logs
+      - name: Aguardando serviços base
         run: |
           echo "Esperando RabbitMQ iniciar..."
           until nc -z localhost 5672; do sleep 2; done
@@ -36,51 +47,27 @@ jobs:
           echo "Esperando Jaeger iniciar..."
           sleep 5
 
-      # Build da imagem app-orders
-      - name: Build app-orders
-        working-directory: app-orders
-        run: docker build -t app-orders .
-
-      # Rodar migrations do app-orders
+      # Rodar migrations do app-orders dentro do container do docker-compose
       - name: Rodar migrations app-orders
-        working-directory: app-orders
         run: |
-          docker run --rm \
-            -e DATABASE_URL="postgres://user:password@host:5432/dbname" \
-            -e OTEL_SERVICE_NAME="app-orders" \
-            --entrypoint sh \
-            app-orders -c "npx drizzle-kit generate && npx drizzle-kit migrate"
+          docker-compose exec -T app-orders sh -c "npx drizzle-kit generate && npx drizzle-kit migrate"
 
-      # Build da imagem app-invoices
-      - name: Build app-invoices
-        working-directory: app-invoices
-        run: docker build -t app-invoices .
-
-      # Rodar migrations do app-invoices
+      # Rodar migrations do app-invoices dentro do container do docker-compose
       - name: Rodar migrations app-invoices
-        working-directory: app-invoices
         run: |
-          docker run --rm \
-            -e DATABASE_URL="postgres://review:Passw0rd2023!@host.docker.internal:5432/review" \
-            -e OTEL_SERVICE_NAME="app-invoices" \
-            --entrypoint sh \
-            app-invoices -c "npx drizzle-kit generate && npx drizzle-kit migrate"
+          docker-compose exec -T app-invoices sh -c "npx drizzle-kit generate && npx drizzle-kit migrate"
 
       # Rodar servidor app-orders e testar endpoint
       - name: Execução do servidor app-orders
-        working-directory: app-orders
         run: |
-          npx tsc
-          node ./dist/src/server.js &  # roda em background
-          SERVER_PID=$!
+          docker-compose exec -T app-orders sh -c "npx tsc && node ./dist/src/server.js &"
           sleep 5
           for i in {1..8}; do
-            curl -s -X POST http://localhost:3000 \
+            curl -s -X POST http://localhost:8000 \
               -H "Content-Type: application/json" \
               -d '{"amount": 4}' || exit 1
           done
-          kill $SERVER_PID
 
       # Limpar containers
-      - name: Stop do serviço do docker-compose
+      - name: Stop do serviço docker-compose
         run: docker-compose down
