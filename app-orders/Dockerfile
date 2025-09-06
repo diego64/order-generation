@@ -33,5 +33,6 @@ EXPOSE 3333
 
 ENV PORT=3333
 ENV HOSTNAME="0.0.0.0"
+ENV OTEL_SERVICE_NAME="app-orders"
 
 ENTRYPOINT ["npm", "run", "start"]
