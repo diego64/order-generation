@@ -9,32 +9,40 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      # Checkout do repositório
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      # Setup Node.js
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
           node-version: '20'
 
+      # Instalação do Docker Compose
       - name: Instalação do Docker Compose
         run: sudo apt-get update && sudo apt-get install -y docker-compose
 
-      # Subir ambiente base
+      # Subir serviços base (RabbitMQ, Kong, Jaeger)
       - name: Build e Start docker-compose
         run: docker-compose up -d --build
 
-      - name: Aguardando o inicio da subida do ambiente base
+      - name: Aguardando inicialização dos serviços base
         run: |
           echo "Esperando RabbitMQ iniciar..."
           until nc -z localhost 5672; do sleep 2; done
           echo "Esperando Kong iniciar..."
           until nc -z localhost 8001; do sleep 2; done
           echo "Esperando Jaeger iniciar..."
-          sleep 5  # Jaeger não tem porta TCP fixa, apenas espera inicial
+          sleep 5
 
-      # Subir app-orders e rodar migrations
-      - name: Build e execução das migrations do app-orders
+      # Build da imagem app-orders
+      - name: Build app-orders
+        working-directory: app-orders
+        run: docker build -t app-orders .
+
+      # Rodar migrations do app-orders
+      - name: Rodar migrations app-orders
         working-directory: app-orders
         run: |
           docker run --rm \
@@ -42,16 +50,20 @@ jobs:
             -e OTEL_SERVICE_NAME="app-orders" \
             app-orders sh -c "npx drizzle-kit generate && npx drizzle-kit migrate"
 
-      # Subir app-invoices e rodar migrations
-      - name: Build e execução das migrations do app-orders app-invoices
+      # Build e migrations do app-invoices
+      - name: Build app-invoices
+        working-directory: app-invoices
+        run: docker build -t app-invoices .
+
+      - name: Rodar migrations app-invoices
         working-directory: app-invoices
         run: |
-          docker build -t app-invoices .
           docker run --rm \
             -e DATABASE_URL="postgres://review:Passw0rd2023!@host.docker.internal:5432/review" \
+            -e OTEL_SERVICE_NAME="app-invoices" \
             app-invoices sh -c "npx drizzle-kit generate && npx drizzle-kit migrate"
 
-      # Rodar server.ts do app-orders e testar
+      # Rodar servidor app-orders e testar endpoint
       - name: Execução do servidor app-orders
         working-directory: app-orders
         run: |
