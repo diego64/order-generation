@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  integration:
+  Integracao:
     runs-on: ubuntu-latest
 
     steps:
@@ -22,7 +22,7 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y docker-compose
 
       # Subir ambiente base
-      - name: Build e start docker-compose base
+      - name: Build e Start docker-compose
         run: docker-compose up -d --build
 
       - name: Aguardando o inicio da subida do ambiente base
