@@ -37,9 +37,9 @@ jobs:
       - name: Build e execução das migrations do app-orders
         working-directory: app-orders
         run: |
-          docker build -t app-orders .
           docker run --rm \
-            -e DATABASE_URL="postgres://review:Passw0rd2023!@host.docker.internal:5432/review" \
+            -e DATABASE_URL="postgres://user:password@host:5432/dbname" \
+            -e OTEL_SERVICE_NAME="app-orders" \
             app-orders sh -c "npx drizzle-kit generate && npx drizzle-kit migrate"
 
       # Subir app-invoices e rodar migrations
