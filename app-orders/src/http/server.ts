@@ -44,7 +44,7 @@ app.post('/orders', {
   await db.insert(schema.orders).values({
     id: orderId,
     //customerId: randomUUID(),
-    customerId: 'c02adfba-bd51-414e-ba7e-caa94c36c257',
+    customerId: '3ad66479-d801-4d46-b876-badfd7302686',
     amount,
   })
 
@@ -60,7 +60,7 @@ app.post('/orders', {
     orderId,
     amount,
     customer: {
-      id: 'c02adfba-bd51-414e-ba7e-caa94c36c257'
+      id: '3ad66479-d801-4d46-b876-badfd7302686'
     },
   })
 
