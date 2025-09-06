@@ -1,3 +1,4 @@
+
 name: Pipeline CI
 run-name: Pipeline CI executada por ${{ github.actor }}
 
@@ -16,7 +17,6 @@ jobs:
         uses: actions/setup-node@v3
         with:
           node-version: '20'
-          cache: 'npm'
 
       - name: Instalação do Docker Compose
         run: sudo apt-get update && sudo apt-get install -y docker-compose
@@ -34,29 +34,23 @@ jobs:
           echo "Esperando Jaeger iniciar..."
           sleep 5  # Jaeger não tem porta TCP fixa, apenas espera inicial
 
-      # Migrations app-orders
-      - name: Instalar deps e rodar migrations do app-orders
+      # Subir app-orders e rodar migrations
+      - name: Build e execução das migrations do app-orders
         working-directory: app-orders
         run: |
-          npm install
-          npx drizzle-kit generate
-          npx drizzle-kit migrate
+          docker build -t app-orders .
+          docker run --rm \
+            -e DATABASE_URL="postgres://review:Passw0rd2023!@host.docker.internal:5432/review" \
+            app-orders sh -c "npx drizzle-kit generate && npx drizzle-kit migrate"
 
-      - name: Build imagem app-orders
-        working-directory: app-orders
-        run: docker build -t app-orders .
-
-      # Migrations app-invoices
-      - name: Instalar deps e rodar migrations do app-invoices
+      # Subir app-invoices e rodar migrations
+      - name: Build e execução das migrations do app-orders app-invoices
         working-directory: app-invoices
         run: |
-          npm install
-          npx drizzle-kit generate
-          npx drizzle-kit migrate
-
-      - name: Build imagem app-invoices
-        working-directory: app-invoices
-        run: docker build -t app-invoices .
+          docker build -t app-invoices .
+          docker run --rm \
+            -e DATABASE_URL="postgres://review:Passw0rd2023!@host.docker.internal:5432/review" \
+            app-invoices sh -c "npx drizzle-kit generate && npx drizzle-kit migrate"
 
       # Rodar server.ts do app-orders e testar
       - name: Execução do servidor app-orders
