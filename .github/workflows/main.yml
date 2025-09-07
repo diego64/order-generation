@@ -38,7 +38,7 @@ jobs:
       - name: Build e Start do docker-compose de mensageria e observabilidade
         run: docker-compose -f docker-compose.yml up -d --build
 
-      # Aguardando inicialização dos serviços de mensageria, API-Gateway e logs
+      # Aguardando inicialização dos serviços
       - name: Aguardando serviços de mensageria e observabilidade
         run: |
           echo "Esperando RabbitMQ iniciar..."
@@ -54,7 +54,7 @@ jobs:
         run: |
           docker-compose run --rm --entrypoint "" \
             -e DATABASE_URL="postgresql://docker:docker@pg:5432/orders" \
-            app-orders npm exec -- drizzle-kit generate && npm exec -- drizzle-kit migrate
+            app-orders sh -c "npm exec -- drizzle-kit generate && npm exec -- drizzle-kit migrate"
 
       # Rodar migrations do app-invoices dentro do container
       - name: Rodar migrations app-invoices
@@ -62,7 +62,7 @@ jobs:
         run: |
           docker-compose run --rm --entrypoint "" \
             -e DATABASE_URL="postgresql://docker:docker@pg:5433/invoices" \
-            app-invoices npm exec -- drizzle-kit generate && npm exec -- drizzle-kit migrate
+            app-invoices sh -c "npm exec -- drizzle-kit generate && npm exec -- drizzle-kit migrate"
 
       # Rodar servidor app-orders e testar endpoint
       - name: Execução do servidor app-orders
