@@ -37,7 +37,7 @@ jobs:
       - name: Build e Start do docker-compose base
         run: docker-compose -f docker-compose.yml up -d --build
 
-      # Aguardando inicialização dos serviços base
+      # Aguardando inicialização dos serviços de mensageria, API-Gateway e logs
       - name: Aguardando serviços base
         run: |
           echo "Esperando RabbitMQ iniciar..."
@@ -51,25 +51,19 @@ jobs:
       - name: Rodar migrations app-orders
         working-directory: app-orders
         run: |
-          docker-compose run --rm \
-            -e DATABASE_URL="postgresql://docker:docker@pg:5432/orders" \
-            app-orders sh -c "npx drizzle-kit generate && npx drizzle-kit migrate"
+          docker-compose run --rm app-orders sh -c "DATABASE_URL=postgresql://docker:docker@db:5432/orders npx drizzle-kit generate && npx drizzle-kit migrate"
 
       # Rodar migrations do app-invoices dentro do container
       - name: Rodar migrations app-invoices
         working-directory: app-invoices
         run: |
-          docker-compose run --rm \
-            -e DATABASE_URL="postgresql://docker:docker@pg:5432/invoices" \
-            app-invoices sh -c "npx drizzle-kit generate && npx drizzle-kit migrate"
+          docker-compose run --rm app-invoices sh -c "DATABASE_URL=postgresql://docker:docker@db:5432/invoices npx drizzle-kit generate && npx drizzle-kit migrate"
 
       # Rodar servidor app-orders e testar endpoint
       - name: Execução do servidor app-orders
         working-directory: app-orders
         run: |
-          docker-compose run --rm \
-            -e DATABASE_URL="postgresql://docker:docker@pg:5432/orders" \
-            app-orders sh -c "npx tsc && node ./dist/src/server.js &"
+          docker-compose run --rm -d app-orders sh -c "npx tsc && node ./dist/src/server.js"
           sleep 5
           for i in {1..8}; do
             curl -s -X POST http://localhost:8000 \
