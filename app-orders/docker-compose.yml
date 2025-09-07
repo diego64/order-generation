@@ -12,7 +12,7 @@ services:
       - ./docker:/docker-entrypoint-initdb.d
 
   app-orders:
-    build: ./app-orders
+    build: .
     depends_on:
       - pg
     environment:

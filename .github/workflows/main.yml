@@ -33,12 +33,12 @@ jobs:
         working-directory: app-invoices
         run: docker-compose up -d --build
 
-      # Subir serviços base (RabbitMQ, Kong, Jaeger)
+      # Subir de mensageria, API-Gateway e logs (RabbitMQ, Kong, Jaeger)
       - name: Build e Start do docker-compose base
         run: docker-compose -f docker-compose.yml up -d --build
 
       # Aguardando inicialização dos serviços de mensageria, API-Gateway e logs
-      - name: Aguardando serviços base
+      - name: Aguardando serviços de mensageria, API-Gateway e logs
         run: |
           echo "Esperando RabbitMQ iniciar..."
           until nc -z localhost 5672; do sleep 2; done
