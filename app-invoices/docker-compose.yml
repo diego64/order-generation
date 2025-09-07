@@ -3,7 +3,7 @@ services:
   pg:
     image: bitnami/postgresql:latest
     ports:
-      - "5482:5433"
+      - "5483:5432"
     environment:
       POSTGRES_USER: docker
       POSTGRES_PASSWORD: docker
@@ -16,4 +16,4 @@ services:
     depends_on:
       - pg
     environment:
-      DATABASE_URL: postgresql://docker:docker@pg:5433/invoices
+      DATABASE_URL: postgresql://docker:docker@pg:5432/invoices
