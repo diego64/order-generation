@@ -7,13 +7,13 @@ services:
     environment:
       POSTGRES_USER: docker
       POSTGRES_PASSWORD: docker
-      POSTGRES_DB: orders
+      POSTGRES_DB: invoices
     volumes:
       - ./docker:/docker-entrypoint-initdb.d
 
-  app-orders:
-    build: ./app-orders
+  app-invoices:
+    build: ./app-invoices
     depends_on:
       - pg
     environment:
-      DATABASE_URL: postgresql://docker:docker@pg:5432/orders
+      DATABASE_URL: postgresql://docker:docker@pg:5432/invoices
