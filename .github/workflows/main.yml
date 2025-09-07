@@ -54,15 +54,15 @@ jobs:
         run: |
           docker-compose run --rm --entrypoint "" \
             -e DATABASE_URL="postgresql://docker:docker@pg:5432/orders" \
-            app-orders npx drizzle-kit generate && npx drizzle-kit migrate
+            app-orders npm exec -- drizzle-kit generate && npm exec -- drizzle-kit migrate
 
       # Rodar migrations do app-invoices dentro do container
       - name: Rodar migrations app-invoices
         working-directory: app-invoices
         run: |
           docker-compose run --rm --entrypoint "" \
-            -e DATABASE_URL="postgresql://docker:docker@pg:5483/invoices" \
-            app-orders npx drizzle-kit generate && npx drizzle-kit migrate
+            -e DATABASE_URL="postgresql://docker:docker@pg:5433/invoices" \
+            app-invoices npm exec -- drizzle-kit generate && npm exec -- drizzle-kit migrate
 
       # Rodar servidor app-orders e testar endpoint
       - name: Execução do servidor app-orders
