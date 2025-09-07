@@ -12,7 +12,7 @@ services:
       - ./docker:/docker-entrypoint-initdb.d
 
   app-invoices:
-    build: .
+    build: ./app-invoices
     depends_on:
       - pg
     environment:
