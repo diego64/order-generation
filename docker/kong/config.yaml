@@ -3,35 +3,20 @@ _transform: true
 
 services:
   - name: orders
-    url: http://host.docker.internal:3333
-    protocol: http
-    host: host.docker.internal
-    port: 3333
-    path: /
-    connect_timeout: 60000
+    url: http://host.docker.internal:3333/
     routes:
       - name: api-orders
-        protocols:
-          - http
-          - https
         paths:
           - /orders
         strip_path: true
 
   - name: invoices
-    url: http://host.docker.internal:3334
-    protocol: http
-    host: host.docker.internal
-    port: 3333
-    path: /
-    connect_timeout: 60000
+    url: http://host.docker.internal:3334/
     routes:
       - name: api-invoices
-        protocols:
-          - http
-          - https
         paths:
           - /invoices
+        strip_path: true
 
 plugins:
   - name: cors
