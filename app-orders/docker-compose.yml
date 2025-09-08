@@ -18,4 +18,4 @@ services:
     environment:
       DATABASE_URL: postgresql://docker:docker@pg:5432/orders
     ports:
-      - "8000:8000"
+      - "18000:8000"
