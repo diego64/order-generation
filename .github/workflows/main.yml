@@ -62,14 +62,14 @@ jobs:
       - name: Teste de endpoints app-orders via Kong
         run: |
           echo "Aguardando app-orders responder via Kong..."
-          until curl -s -f http://localhost:8000/app-orders > /dev/null; do
+          until curl -s -f http://localhost:8000/orders > /dev/null; do
             echo "Ainda não disponível... tentando novamente em 5s"
             sleep 5
           done
           echo "app-orders pronto!"
 
           for i in {1..8}; do
-            curl -s -X POST http://localhost:8000/app-orders/orders \
+            curl -s -X POST http://localhost:8000/orders \
               -H "Content-Type: application/json" \
               -d '{"amount": 4}' || exit 1
           done
