@@ -56,20 +56,22 @@ jobs:
             -e DATABASE_URL="postgresql://docker:docker@pg:5432/orders" \
             app-orders sh -c "npm exec -- drizzle-kit generate && npm exec -- drizzle-kit migrate"
 
-      # Executar migrations do app-invoices dentro do container
-      - name: Executar migrations app-invoices
-        working-directory: app-invoices
-        run: |
-          docker-compose run --rm --entrypoint "" \
-            -e DATABASE_URL="postgresql://docker:docker@pg:5432/invoices" \
-            app-invoices sh -c "npm exec -- drizzle-kit generate && npm exec -- drizzle-kit migrate"
-
-      # Executar servidor app-orders
+      # Executar servidor app-orders e testar endpoints
       - name: Execução do servidor app-orders
         working-directory: app-orders
         run: |
+          # Iniciar o app-orders
           docker-compose run --rm -d app-orders sh -c "node --env-file=.env --experimental-strip-types --watch --no-warnings src/http/server.ts"
-          sleep 5
+
+          # Esperar até que o serviço esteja pronto (Kong + app-orders)
+          echo "Aguardando app-orders subir..."
+          until curl -s -f http://localhost:8000/orders/orders > /dev/null; do
+            echo "Ainda não disponível... tentando novamente em 2s"
+            sleep 2
+          done
+          echo "app-orders pronto!"
+
+          # Rodar os testes de requisição
           for i in {1..8}; do
             curl -s -X POST http://localhost:8000/orders/orders \
               -H "Content-Type: application/json" \
