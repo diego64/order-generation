@@ -22,14 +22,7 @@ jobs:
 
       # Instalação do Docker Compose e cliente PostgreSQL
       - name: Instalação do Docker Compose e PostgreSQL Client
-        run: sudo apt-get update && sudo apt-get install -y docker-compose postgresql-client netcat
-
-      # Garantir que nenhum container antigo esteja rodando
-      - name: Limpar containers antigos
-        run: |
-          docker-compose -f app-orders/docker-compose.yml down || true
-          docker-compose -f app-invoices/docker-compose.yml down || true
-          docker-compose -f docker-compose.yml down || true
+        run: sudo apt-get update && sudo apt-get install -y docker-compose postgresql-client
 
       # Inicialização do Banco de dados PostgreSQL (orders)
       - name: Build do Banco de dados orders
@@ -55,43 +48,35 @@ jobs:
           echo "Esperando Jaeger iniciar..."
           sleep 5
 
-      # Executar migrations do app-orders
-      - name: Executar migrations app-orders
+      # Executar servidor app-orders e rodar testes
+      - name: Execução do servidor app-orders e testes
         working-directory: app-orders
         run: |
-          docker-compose run --rm --entrypoint "" \
-            -e DATABASE_URL="postgresql://docker:docker@pg:5432/orders" \
-            app-orders sh -c "npm exec -- drizzle-kit generate && npm exec -- drizzle-kit migrate"
-
-      # Subir o app-orders em background
-      - name: Execução do servidor app-orders
-        working-directory: app-orders
-        run: |
+          # Subir o app-orders em background com a porta 8000 exposta
           docker-compose up -d app-orders
+
+          # Aguardar até que o serviço esteja pronto
           echo "Aguardando app-orders subir..."
           until curl -s -f http://localhost:8000/orders/orders > /dev/null; do
-              echo "Ainda não disponível... tentando novamente em 10s"
-              sleep 10
+              echo "Ainda não disponível... tentando novamente em 2s"
+              sleep 2
           done
           echo "app-orders pronto!"
 
-      # Rodar os testes de requisição
-      - name: Testes de integração app-orders
-        run: |
+          # Rodar os testes de requisição
           for i in {1..8}; do
             curl -s -X POST http://localhost:8000/orders/orders \
               -H "Content-Type: application/json" \
               -d '{"amount": 4}' || exit 1
           done
 
-      # Executar servidor app-invoices
-      - name: Execução do servidor app-invoices
-        working-directory: app-invoices
-        run: |
-          docker-compose up -d app-invoices
-          echo "Aguardando app-invoices subir..."
-          sleep 10
+            # Executar servidor app-invoices
+            - name: Execução do servidor app-invoices
+              working-directory: app-invoices
+              run: |
+                docker-compose run --rm -d app-invoices sh -c "node --env-file=.env --experimental-strip-types --watch --no-warnings src/http/server.ts"
+                sleep 5
 
-      # Limpar todos os containers
+      # Limpar containers
       - name: Stop do serviço docker-compose
         run: docker-compose down
