@@ -21,35 +21,36 @@ jobs:
           node-version: '22'
 
       # Instalação do Docker Compose, PostgreSQL Client e Netcat
-      - name: Instalação de dependências
+      - name: Instalação do Docker Compose e PostgreSQL Client
         run: sudo apt-get update && sudo apt-get install -y docker-compose postgresql-client netcat-openbsd curl
 
-      # Inicialização dos bancos de dados
-      - name: Build do Banco de dados orders
+      # Subir app-orders (Postgres + App)
+      - name: Build do Banco de dados orders + app-orders
         working-directory: app-orders
         run: docker-compose up -d --build
 
-      - name: Build do Banco de dados invoices
+      # Subir app-invoices (Postgres + App)
+      - name: Build do Banco de dados invoices + app-invoices
         working-directory: app-invoices
         run: docker-compose up -d --build
 
-      # Subir serviços de mensageria e observabilidade
+      # Subir serviços de mensageria e observabilidade (RabbitMQ, Kong, Jaeger)
       - name: Build e Start do docker-compose de mensageria e observabilidade
         run: docker-compose -f docker-compose.yml up -d --build
 
-      # Espera inicial dos serviços essenciais
-      - name: Aguardando serviços essenciais
+      # Aguardando inicialização dos serviços
+      - name: Aguardando serviços de mensageria e observabilidade
         run: |
           echo "Esperando RabbitMQ iniciar..."
           until nc -z localhost 5672; do sleep 2; done
           echo "Esperando Kong iniciar..."
-          until nc -z localhost 8001; do sleep 2; done
-          echo "Esperando Jaeger Proxy iniciar..."
           until nc -z localhost 8000; do sleep 2; done
-          echo "Esperando Jaeger API iniciar..."
+          echo "Esperando Jaeger iniciar..."
+          until nc -z localhost 16686; do sleep 2; done
           sleep 10
+          echo "Serviços prontos!"
 
-      # Executar migrations do app-orders
+      # Executar migrations do app-orders dentro do container
       - name: Executar migrations app-orders
         working-directory: app-orders
         run: |
@@ -57,49 +58,22 @@ jobs:
             -e DATABASE_URL="postgresql://docker:docker@pg:5432/orders" \
             app-orders sh -c "npm exec -- drizzle-kit generate && npm exec -- drizzle-kit migrate"
 
-      # Subir app-orders em background na porta interna 8000
-      - name: Execução do servidor app-orders
-        working-directory: app-orders
-        run: docker-compose up -d app-orders
-
-      # Configurar rota no Kong para app-orders
-      - name: Criar serviço e rota no Kong
+      # Testar app-orders via Kong
+      - name: Teste de endpoints app-orders via Kong
         run: |
-          echo "Criando serviço app-orders no Kong..."
-          curl -s -X POST http://localhost:8001/services/ \
-            --data name=app-orders \
-            --data url=http://host.docker.internal:18000 || echo "Serviço já existe"
-
-          echo "Criando rota /orders/orders..."
-          curl -s -X POST http://localhost:8001/services/app-orders/routes \
-            --data paths[]=/orders/orders || echo "Rota já existe"
-
-      # Espera até que o app-orders esteja disponível via Kong
-      - name: Aguardando app-orders pronto via Kong
-        run: |
-          echo "Aguardando app-orders subir via Kong..."
-          until curl -s -f http://localhost:8000/orders/orders > /dev/null; do
+          echo "Aguardando app-orders responder via Kong..."
+          until curl -s -f http://localhost:8000/app-orders > /dev/null; do
             echo "Ainda não disponível... tentando novamente em 5s"
             sleep 5
           done
           echo "app-orders pronto!"
 
-      # Teste de POST no app-orders
-      - name: Teste de endpoints app-orders
-        run: |
           for i in {1..8}; do
-            curl -s -X POST http://localhost:8000/orders/orders \
+            curl -s -X POST http://localhost:8000/app-orders/orders \
               -H "Content-Type: application/json" \
               -d '{"amount": 4}' || exit 1
           done
 
-      # Executar servidor app-invoices
-      - name: Execução do servidor app-invoices
-        working-directory: app-invoices
-        run: |
-          docker-compose run --rm -d app-invoices sh -c "node --env-file=.env --experimental-strip-types --watch --no-warnings src/http/server.ts"
-          sleep 10
-
-      # Limpar containers ao final
+      # Limpar containers
       - name: Stop do serviço docker-compose
         run: docker-compose down

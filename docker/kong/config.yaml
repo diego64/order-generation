@@ -18,6 +18,14 @@ services:
           - /invoices
         strip_path: true
 
+  - name: app-orders
+    url: http://host.docker.internal:18000/
+    routes:
+      - name: api-app-orders
+        paths:
+          - /app-orders
+        strip_path: true
+
 plugins:
   - name: cors
     config:
