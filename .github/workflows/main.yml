@@ -18,7 +18,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: '20'
+          node-version: '22'
 
       # Instalação do Docker Compose e cliente PostgreSQL
       - name: Instalação do Docker Compose e PostgreSQL Client
@@ -64,17 +64,24 @@ jobs:
             -e DATABASE_URL="postgresql://docker:docker@pg:5432/invoices" \
             app-invoices sh -c "npm exec -- drizzle-kit generate && npm exec -- drizzle-kit migrate"
 
-      # Executar servidor app-orders e testar endpoint
+      # Executar servidor app-orders
       - name: Execução do servidor app-orders
         working-directory: app-orders
         run: |
-          docker-compose run --rm -d app-orders sh -c "npx tsc && node ./dist/src/server.js"
+          docker-compose run --rm -d app-orders sh -c "node --env-file=.env --experimental-strip-types --watch --no-warnings src/http/server.ts"
           sleep 5
           for i in {1..8}; do
-            curl -s -X POST http://localhost:8000 \
+            curl -s -X POST http://localhost:8000/orders \
               -H "Content-Type: application/json" \
               -d '{"amount": 4}' || exit 1
           done
+
+      # Executar servidor app-invoices
+      - name: Execução do servidor app-invoices
+        working-directory: app-invoices
+        run: |
+          docker-compose run --rm -d app-invoices sh -c "node --env-file=.env --experimental-strip-types --watch --no-warnings src/http/server.ts"
+          sleep 5
 
       # Limpar containers
       - name: Stop do serviço docker-compose
