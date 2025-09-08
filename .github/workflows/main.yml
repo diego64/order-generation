@@ -21,46 +21,35 @@ jobs:
           node-version: '22'
 
       # Instalação do Docker Compose, PostgreSQL Client e Netcat
-      - name: Instalação do Docker Compose, PostgreSQL Client e Netcat
-        run: sudo apt-get update && sudo apt-get install -y docker-compose postgresql-client netcat-openbsd
+      - name: Instalação de dependências
+        run: sudo apt-get update && sudo apt-get install -y docker-compose postgresql-client netcat-openbsd curl
 
-      # Inicialização do Banco de dados PostgreSQL (orders)
+      # Inicialização dos bancos de dados
       - name: Build do Banco de dados orders
         working-directory: app-orders
         run: docker-compose up -d --build
 
-      # Inicialização do Banco de dados PostgreSQL (invoices)
       - name: Build do Banco de dados invoices
         working-directory: app-invoices
         run: docker-compose up -d --build
 
-      # Subir serviços de mensageria e observabilidade (RabbitMQ, Kong, Jaeger)
+      # Subir serviços de mensageria e observabilidade
       - name: Build e Start do docker-compose de mensageria e observabilidade
         run: docker-compose -f docker-compose.yml up -d --build
 
-      # Aguardando inicialização dos serviços de mensageria e observabilidade
-      - name: Aguardando serviços de mensageria e observabilidade
+      # Espera inicial dos serviços essenciais
+      - name: Aguardando serviços essenciais
         run: |
           echo "Esperando RabbitMQ iniciar..."
           until nc -z localhost 5672; do sleep 2; done
           echo "Esperando Kong iniciar..."
-          until nc -z localhost 8000; do sleep 2; done
-          echo "Esperando Jaeger Proxy iniciar..."
           until nc -z localhost 8001; do sleep 2; done
+          echo "Esperando Jaeger Proxy iniciar..."
+          until nc -z localhost 8000; do sleep 2; done
           echo "Esperando Jaeger API iniciar..."
           sleep 10
 
-      # Esperar o banco do app-orders ficar pronto
-      - name: Aguardando PostgreSQL app-orders
-        run: |
-          echo "Aguardando PostgreSQL do app-orders..."
-          until pg_isready -h localhost -p 5482 -U docker > /dev/null; do
-            echo "Banco ainda não disponível... tentando novamente em 5s"
-            sleep 5
-          done
-          echo "Banco PostgreSQL pronto!"
-
-      # Executar migrations do app-orders dentro do container
+      # Executar migrations do app-orders
       - name: Executar migrations app-orders
         working-directory: app-orders
         run: |
@@ -68,22 +57,34 @@ jobs:
             -e DATABASE_URL="postgresql://docker:docker@pg:5432/orders" \
             app-orders sh -c "npm exec -- drizzle-kit generate && npm exec -- drizzle-kit migrate"
 
-      # Executar servidor app-orders
+      # Subir app-orders em background na porta interna 8000
       - name: Execução do servidor app-orders
         working-directory: app-orders
         run: docker-compose up -d app-orders
 
-      # Aguardar app-orders subir via Kong
-      - name: Aguardando app-orders via Kong
+      # Configurar rota no Kong para app-orders
+      - name: Criar serviço e rota no Kong
+        run: |
+          echo "Criando serviço app-orders no Kong..."
+          curl -s -X POST http://localhost:8001/services/ \
+            --data name=app-orders \
+            --data url=http://host.docker.internal:18000 || echo "Serviço já existe"
+
+          echo "Criando rota /orders/orders..."
+          curl -s -X POST http://localhost:8001/services/app-orders/routes \
+            --data paths[]=/orders/orders || echo "Rota já existe"
+
+      # Espera até que o app-orders esteja disponível via Kong
+      - name: Aguardando app-orders pronto via Kong
         run: |
           echo "Aguardando app-orders subir via Kong..."
-          until curl -s -f http://localhost:8000/orders/orders > /dev/null 2>&1; do
-            echo "Ainda não disponível... tentando novamente em 10s"
-            sleep 10
+          until curl -s -f http://localhost:8000/orders/orders > /dev/null; do
+            echo "Ainda não disponível... tentando novamente em 5s"
+            sleep 5
           done
-          echo "app-orders pronto via Kong!"
+          echo "app-orders pronto!"
 
-      # Rodar testes de requisição no app-orders
+      # Teste de POST no app-orders
       - name: Teste de endpoints app-orders
         run: |
           for i in {1..8}; do
@@ -99,6 +100,6 @@ jobs:
           docker-compose run --rm -d app-invoices sh -c "node --env-file=.env --experimental-strip-types --watch --no-warnings src/http/server.ts"
           sleep 10
 
-      # Limpar containers
+      # Limpar containers ao final
       - name: Stop do serviço docker-compose
         run: docker-compose down
