@@ -56,18 +56,26 @@ jobs:
             -e DATABASE_URL="postgresql://docker:docker@pg:5432/orders" \
             app-orders sh -c "npm exec -- drizzle-kit generate && npm exec -- drizzle-kit migrate"
 
-      # Executar servidor app-orders e testar endpoints
+      # Executar migrations do app-orders
+      - name: Executar migrations app-orders
+        working-directory: app-orders
+        run: |
+          docker-compose run --rm --entrypoint "" \
+            -e DATABASE_URL="postgresql://docker:docker@pg:5432/orders" \
+            app-orders sh -c "npm exec -- drizzle-kit generate && npm exec -- drizzle-kit migrate"
+
+      # Executar o servidor app-orders
       - name: Execução do servidor app-orders
         working-directory: app-orders
         run: |
-          # Iniciar o app-orders
-          docker-compose run --rm -d app-orders sh -c "node --env-file=.env --experimental-strip-types --watch --no-warnings src/http/server.ts"
+          # Subir o container em background usando 'up -d'
+          docker-compose up -d app-orders
 
-          # Esperar até que o serviço esteja pronto (Kong + app-orders)
+          # Esperar até que o serviço esteja pronto
           echo "Aguardando app-orders subir..."
           until curl -s -f http://localhost:8000/orders/orders > /dev/null; do
-            echo "Ainda não disponível... tentando novamente em 2s"
-            sleep 2
+              echo "Ainda não disponível... tentando novamente em 10s"
+              sleep 10
           done
           echo "app-orders pronto!"
 
@@ -78,12 +86,12 @@ jobs:
               -d '{"amount": 4}' || exit 1
           done
 
-      # Executar servidor app-invoices
+      # Executar o servidor app-invoices
       - name: Execução do servidor app-invoices
         working-directory: app-invoices
         run: |
-          docker-compose run --rm -d app-invoices sh -c "node --env-file=.env --experimental-strip-types --watch --no-warnings src/http/server.ts"
-          sleep 5
+          docker-compose up -d app-invoices
+          sleep 10
 
       # Limpar containers
       - name: Stop do serviço docker-compose
