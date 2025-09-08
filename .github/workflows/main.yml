@@ -20,16 +20,9 @@ jobs:
         with:
           node-version: '22'
 
-      # Instalação do Docker Compose e cliente PostgreSQL
+      # Instalação do Docker Compose, PostgreSQL Client e Netcat
       - name: Instalação do Docker Compose e PostgreSQL Client
-        run: sudo apt-get update && sudo apt-get install -y docker-compose postgresql-client netcat
-
-      # Garantir que nenhum container antigo esteja rodando
-      - name: Limpar containers antigos
-        run: |
-          docker-compose -f app-orders/docker-compose.yml down || true
-          docker-compose -f app-invoices/docker-compose.yml down || true
-          docker-compose -f docker-compose.yml down || true
+        run: sudo apt-get update && sudo apt-get install -y docker-compose postgresql-client netcat-openbsd
 
       # Inicialização do Banco de dados PostgreSQL (orders)
       - name: Build do Banco de dados orders
@@ -55,7 +48,7 @@ jobs:
           echo "Esperando Jaeger iniciar..."
           sleep 5
 
-      # Executar migrations do app-orders
+      # Executar migrations do app-orders dentro do container
       - name: Executar migrations app-orders
         working-directory: app-orders
         run: |
@@ -63,20 +56,24 @@ jobs:
             -e DATABASE_URL="postgresql://docker:docker@pg:5432/orders" \
             app-orders sh -c "npm exec -- drizzle-kit generate && npm exec -- drizzle-kit migrate"
 
-      # Subir o app-orders em background
+      # Executar servidor app-orders
       - name: Execução do servidor app-orders
         working-directory: app-orders
         run: |
           docker-compose up -d app-orders
+
+      # Aguardar app-orders subir via Kong
+      - name: Aguardando app-orders pronto
+        run: |
           echo "Aguardando app-orders subir..."
           until curl -s -f http://localhost:8000/orders/orders > /dev/null; do
-              echo "Ainda não disponível... tentando novamente em 10s"
-              sleep 10
+            echo "Ainda não disponível... tentando novamente em 2s"
+            sleep 2
           done
           echo "app-orders pronto!"
 
-      # Rodar os testes de requisição
-      - name: Testes de integração app-orders
+      # Rodar testes de requisição
+      - name: Teste de endpoints app-orders
         run: |
           for i in {1..8}; do
             curl -s -X POST http://localhost:8000/orders/orders \
@@ -88,10 +85,9 @@ jobs:
       - name: Execução do servidor app-invoices
         working-directory: app-invoices
         run: |
-          docker-compose up -d app-invoices
-          echo "Aguardando app-invoices subir..."
-          sleep 10
+          docker-compose run --rm -d app-invoices sh -c "node --env-file=.env --experimental-strip-types --watch --no-warnings src/http/server.ts"
+          sleep 5
 
-      # Limpar todos os containers
+      # Limpar containers
       - name: Stop do serviço docker-compose
         run: docker-compose down
