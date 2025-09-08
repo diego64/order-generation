@@ -48,34 +48,18 @@ jobs:
           echo "Esperando Jaeger iniciar..."
           sleep 5
 
-      # Executar migrations do app-orders dentro do container
-      - name: Executar migrations app-orders
+      # Executar servidor app-orders e rodar testes
+      - name: Execução do servidor app-orders e testes
         working-directory: app-orders
         run: |
-          docker-compose run --rm --entrypoint "" \
-            -e DATABASE_URL="postgresql://docker:docker@pg:5432/orders" \
-            app-orders sh -c "npm exec -- drizzle-kit generate && npm exec -- drizzle-kit migrate"
-
-      # Executar migrations do app-orders
-      - name: Executar migrations app-orders
-        working-directory: app-orders
-        run: |
-          docker-compose run --rm --entrypoint "" \
-            -e DATABASE_URL="postgresql://docker:docker@pg:5432/orders" \
-            app-orders sh -c "npm exec -- drizzle-kit generate && npm exec -- drizzle-kit migrate"
-
-      # Executar o servidor app-orders
-      - name: Execução do servidor app-orders
-        working-directory: app-orders
-        run: |
-          # Subir o container em background usando 'up -d'
+          # Subir o app-orders em background com a porta 8000 exposta
           docker-compose up -d app-orders
 
-          # Esperar até que o serviço esteja pronto
+          # Aguardar até que o serviço esteja pronto
           echo "Aguardando app-orders subir..."
           until curl -s -f http://localhost:8000/orders/orders > /dev/null; do
-              echo "Ainda não disponível... tentando novamente em 10s"
-              sleep 10
+              echo "Ainda não disponível... tentando novamente em 2s"
+              sleep 2
           done
           echo "app-orders pronto!"
 
@@ -86,12 +70,12 @@ jobs:
               -d '{"amount": 4}' || exit 1
           done
 
-      # Executar o servidor app-invoices
-      - name: Execução do servidor app-invoices
-        working-directory: app-invoices
-        run: |
-          docker-compose up -d app-invoices
-          sleep 10
+            # Executar servidor app-invoices
+            - name: Execução do servidor app-invoices
+              working-directory: app-invoices
+              run: |
+                docker-compose run --rm -d app-invoices sh -c "node --env-file=.env --experimental-strip-types --watch --no-warnings src/http/server.ts"
+                sleep 5
 
       # Limpar containers
       - name: Stop do serviço docker-compose
