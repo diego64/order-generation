@@ -66,7 +66,7 @@ jobs:
       - name: Aguardando app-orders pronto
         run: |
           echo "Aguardando app-orders subir..."
-          until curl -s -f http://localhost:8000/orders/orders > /dev/null; do
+          until curl -s -f http://localhost:18000/orders/orders > /dev/null; do
             echo "Ainda não disponível... tentando novamente em 2s"
             sleep 2
           done
