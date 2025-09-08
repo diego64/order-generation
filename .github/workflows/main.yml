@@ -48,23 +48,23 @@ jobs:
           echo "Esperando Jaeger iniciar..."
           sleep 5
 
-      # Rodar migrations do app-orders dentro do container
-      - name: Rodar migrations app-orders
+      # Executar migrations do app-orders dentro do container
+      - name: Executar migrations app-orders
         working-directory: app-orders
         run: |
           docker-compose run --rm --entrypoint "" \
             -e DATABASE_URL="postgresql://docker:docker@pg:5432/orders" \
             app-orders sh -c "npm exec -- drizzle-kit generate && npm exec -- drizzle-kit migrate"
 
-      # Rodar migrations do app-invoices dentro do container
-      - name: Rodar migrations app-invoices
+      # Executar migrations do app-invoices dentro do container
+      - name: Executar migrations app-invoices
         working-directory: app-invoices
         run: |
           docker-compose run --rm --entrypoint "" \
-            -e DATABASE_URL="postgresql://docker:docker@pg:5433/invoices" \
+            -e DATABASE_URL="postgresql://docker:docker@pg:5432/invoices" \
             app-invoices sh -c "npm exec -- drizzle-kit generate && npm exec -- drizzle-kit migrate"
 
-      # Rodar servidor app-orders e testar endpoint
+      # Executar servidor app-orders e testar endpoint
       - name: Execução do servidor app-orders
         working-directory: app-orders
         run: |
