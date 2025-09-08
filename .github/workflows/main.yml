@@ -22,24 +22,24 @@ jobs:
 
       # Instalação do Docker Compose, PostgreSQL Client e Netcat
       - name: Instalação do Docker Compose e PostgreSQL Client
-        run: sudo apt-get update && sudo apt-get install -y docker-compose postgresql-client netcat-openbsd curl
+        run: sudo apt-get update && sudo apt-get install -y docker-compose postgresql-client netcat-openbsd
 
-      # Subir app-orders (Postgres + App)
-      - name: Build do Banco de dados orders + app-orders
+      # Subir app-orders (com DB interno)
+      - name: Subir app-orders
         working-directory: app-orders
         run: docker-compose up -d --build
 
-      # Subir app-invoices (Postgres + App)
-      - name: Build do Banco de dados invoices + app-invoices
+      # Subir app-invoices (com DB interno)
+      - name: Subir app-invoices
         working-directory: app-invoices
         run: docker-compose up -d --build
 
-      # Subir serviços de mensageria e observabilidade (RabbitMQ, Kong, Jaeger)
-      - name: Build e Start do docker-compose de mensageria e observabilidade
+      # Subir mensageria (RabbitMQ), observabilidade (Jaeger) e API Gateway (Kong)
+      - name: Subir serviços de mensageria e observabilidade
         run: docker-compose -f docker-compose.yml up -d --build
 
-      # Aguardando inicialização dos serviços
-      - name: Aguardando serviços de mensageria e observabilidade
+      # Aguardando serviços de infraestrutura
+      - name: Aguardando serviços de infraestrutura
         run: |
           echo "Esperando RabbitMQ iniciar..."
           until nc -z localhost 5672; do sleep 2; done
@@ -47,10 +47,9 @@ jobs:
           until nc -z localhost 8000; do sleep 2; done
           echo "Esperando Jaeger iniciar..."
           until nc -z localhost 16686; do sleep 2; done
-          sleep 10
-          echo "Serviços prontos!"
+          echo "Infraestrutura pronta!"
 
-      # Executar migrations do app-orders dentro do container
+      # Executar migrations do app-orders
       - name: Executar migrations app-orders
         working-directory: app-orders
         run: |
@@ -58,8 +57,8 @@ jobs:
             -e DATABASE_URL="postgresql://docker:docker@pg:5432/orders" \
             app-orders sh -c "npm exec -- drizzle-kit generate && npm exec -- drizzle-kit migrate"
 
-      # Testar app-orders via Kong
-      - name: Teste de endpoints app-orders via Kong
+      # Healthcheck do app-orders via Kong
+      - name: Aguardando app-orders pronto
         run: |
           echo "Aguardando app-orders responder via Kong..."
           until curl -s -f http://localhost:8000/orders > /dev/null; do
@@ -68,12 +67,30 @@ jobs:
           done
           echo "app-orders pronto!"
 
+      # Testes de endpoints do app-orders via Kong
+      - name: Teste de endpoints app-orders
+        run: |
           for i in {1..8}; do
             curl -s -X POST http://localhost:8000/orders \
               -H "Content-Type: application/json" \
               -d '{"amount": 4}' || exit 1
           done
 
+      # Healthcheck do app-invoices via Kong
+      - name: Aguardando app-invoices pronto
+        run: |
+          echo "Aguardando app-invoices responder via Kong..."
+          until curl -s -f http://localhost:8000/invoices > /dev/null; do
+            echo "Ainda não disponível... tentando novamente em 5s"
+            sleep 5
+          done
+          echo "app-invoices pronto!"
+
+      # Testes de endpoints do app-invoices via Kong
+      - name: Teste de endpoints app-invoices
+        run: |
+          curl -s -X GET http://localhost:8000/invoices || exit 1
+
       # Limpar containers
-      - name: Stop do serviço docker-compose
+      - name: Stop dos serviços docker-compose
         run: docker-compose down
