@@ -71,7 +71,7 @@ jobs:
           docker-compose run --rm -d app-orders sh -c "node --env-file=.env --experimental-strip-types --watch --no-warnings src/http/server.ts"
           sleep 5
           for i in {1..8}; do
-            curl -s -X POST http://localhost:8000/orders \
+            curl -s -X POST http://localhost:8000/orders/orders \
               -H "Content-Type: application/json" \
               -d '{"amount": 4}' || exit 1
           done
